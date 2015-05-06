@@ -1,0 +1,59 @@
+#!/usr/bin/env coffee
+
+conf = require('config')
+request = require('request')
+fs = require('fs')
+Iconv = require('iconv').Iconv
+cheerio = require('cheerio')
+Encoding = require('encoding-japanese')
+
+
+urlEncode = (string) ->
+  iconv = new Iconv('UTF-8', 'EUC-JP//TRANSLIT//IGNORE')
+  string = iconv.convert(string)
+  string = Encoding.urlEncode(string)
+
+postTemplates = (template) ->
+  # for tpl
+  tplFile = conf.folder + '/templates/' + template.name + '.tpl'
+  tpl = fs.readFileSync(tplFile)
+  tpl = urlEncode tpl
+
+  # for css
+  cssFile = conf.folder + '/css/' + template.name + '.css'
+  css = fs.readFileSync(cssFile)
+  css = urlEncode css
+
+  callback = (error, response, body) ->
+    if !error && response.statusCode == 200
+      iconv = new Iconv('EUC-JP', 'UTF-8//TRANSLIT//IGNORE')
+      contents = iconv.convert(body).toString()
+      $ = cheerio.load(contents)
+
+      html = $('#html').text()
+      # ログアウト判定
+      if html == ''
+        console.log('ログアウト状態です。セッションIDをセットし直してください')
+        return
+
+      console.log(template.name + 'の保存が終わりました')
+
+
+  url = conf.admin.url + '/?mode=design_tmpl_edt&smode=HTCS&type=TBLUPD'
+
+  j = request.jar()
+  cookie = request.cookie('PHPSESSID=' + conf.admin.PHPSESSID)
+  j.setCookie(cookie, conf.admin.url)
+
+
+  # 文字列として渡して、tplをurlエンコードすれば上手く行くことがわかった。
+  form = 'html=' + tpl + '&css=' + css + '&tmpl_uid=' + conf.admin.tmpl_uid + '&tmpl_type=' + template.templ_type
+
+  request.post( {
+    url: url,
+    encoding: null,
+    form: form,
+    jar: j
+  }, callback )
+
+for template in conf.templates then postTemplates(template)

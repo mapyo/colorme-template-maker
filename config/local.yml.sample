@@ -1,0 +1,4 @@
+admin:
+  url: 'https://admin.shop-pro.jp'
+  PHPSESSID: 'hogehogehogehogehoge'
+  tmpl_uid: 17

@@ -1,0 +1,48 @@
+#!/usr/bin/env coffee
+
+conf = require('config')
+request = require('request')
+Iconv = require('iconv').Iconv
+cheerio = require('cheerio')
+fs = require('fs')
+
+
+getTemplates = (template) ->
+  path = conf.folder + '/' + template.name
+  tplFile = conf.folder + '/templates/' + template.name + '.tpl'
+  cssFile = conf.folder + '/css/' + template.name + '.css'
+
+  callback = (error, response, body) ->
+    if !error && response.statusCode == 200
+      iconv = new Iconv('EUC-JP', 'UTF-8//TRANSLIT//IGNORE')
+      contents = iconv.convert(body).toString()
+      $ = cheerio.load(contents)
+      html = $('#html').text()
+
+      # ログアウト判定
+      if html == ''
+        console.log('ログアウト状態です。セッションIDをセットし直してください')
+        return
+
+      html = html.replace(/\r\n/g, '\n')
+      fs.writeFileSync(tplFile, html)
+
+      css = $('#css').text()
+      css = css.replace(/\r\n/g, '\n')
+      fs.writeFileSync(cssFile, css)
+
+      console.log(template.name + 'の取得が終わりました')
+
+  j = request.jar()
+  cookie = request.cookie('PHPSESSID=' + conf.admin.PHPSESSID)
+  j.setCookie(cookie, conf.admin.url)
+
+  url = conf.admin.url + '/?mode=design_tmpl_edt&smode=HTCS&tmpl_uid=' + conf.admin.tmpl_uid + '&tmpl_type=' + template.templ_type
+
+  request.get( {
+    url: url,
+    encoding: null,
+    jar: j
+  }, callback )
+
+for template in conf.templates then getTemplates(template)
